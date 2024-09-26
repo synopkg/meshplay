@@ -5,7 +5,7 @@ on:
 jobs:
     cncf-staging-playground-rollout:
         name: Update Meshery on CNCF staging playground
-        if: github.repository == 'meshery/meshery'
+        if: github.repository == 'synopkg/meshplay'
         runs-on: ubuntu-latest 
         steps:
         - name: Upgrade Meshery Helm Release
