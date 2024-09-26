@@ -1,0 +1,79 @@
+name: Rename Files
+
+on:
+  workflow_dispatch:
+    inputs:
+      oldname:
+        description: 'The substring to replace in filenames'
+        required: true
+        type: string
+      newname:
+        description: 'The substring to use as a replacement in filenames'
+        required: true
+        type: string
+      branch:
+        description: 'The name of the new branch to push changes to'
+        required: true
+        type: string
+
+jobs:
+  rename_files:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set inputs as environment variables
+        run: |
+          echo "OLDNAME=${{ github.event.inputs.oldname }}" >> $GITHUB_ENV
+          echo "NEWNAME=${{ github.event.inputs.newname }}" >> $GITHUB_ENV
+          echo "BRANCH=${{ github.event.inputs.branch }}" >> $GITHUB_ENV
+
+      - name: Create and switch to new branch
+        run: |
+          git checkout -b "${BRANCH}"
+
+      - name: Rename files
+        run: |
+          # Find and rename files
+          find . -name "*${OLDNAME}*" | while read file; do
+            new_file=$(echo "$file" | sed "s/${OLDNAME}/${NEWNAME}/g")
+            
+            # Check if the new file name already exists
+            if [[ "$file" != "$new_file" ]]; then
+              if [[ -e "$new_file" ]]; then
+                echo "Error: $new_file already exists. Skipping renaming $file."
+                continue
+              fi
+              mv "$file" "$new_file"
+              echo "Renamed: $file to $new_file"
+            else
+              echo "No change needed for $file"
+            fi
+          done
+
+      - name: Check if any files were changed
+        run: |
+          if git diff --exit-code > /dev/null; then
+            echo "No files were changed."
+            exit 0
+          else
+            echo "Files were changed, proceeding with commit."
+          fi
+
+      - name: Commit and push changes to new branch
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add .
+          git commit -m "Rename files from ${{ github.event.inputs.oldname }} to ${{ github.event.inputs.newname }}" || echo "No changes to commit"
+          git push origin "${BRANCH}"
+          
+      - name: Create a pull request
+        uses: peter-evans/create-pull-request@v5
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          branch: "${BRANCH}"
+          title: "Renaming files from ${{ github.event.inputs.oldname }} to ${{ github.event.inputs.newname }}"
+          body: "This pull request contains the changes for renaming files from **${{ github.event.inputs.oldname }}** to **${{ github.event.inputs.newname }}**."
